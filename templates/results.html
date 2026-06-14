@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Analysis Results — Network Threat Hunter</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { background: #0d1117; color: #c9d1d9; font-family: 'Segoe UI', sans-serif; padding: 32px; }
+        h1 { color: #00c8ff; font-size: 1.8rem; margin-bottom: 4px; }
+        .back { color: #8b949e; font-size: 0.85rem; margin-bottom: 32px; display: block; text-decoration: none; }
+        .back:hover { color: #00c8ff; }
+
+        /* Stats */
+        .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 32px; }
+        .stat { background: #161b22; border: 1px solid #30363d; border-radius: 10px; padding: 20px; text-align: center; }
+        .stat .num { font-size: 2rem; font-weight: 700; color: #00c8ff; }
+        .stat .label { font-size: 0.8rem; color: #8b949e; margin-top: 4px; }
+
+        /* Sections */
+        .section { background: #161b22; border: 1px solid #30363d; border-radius: 10px; padding: 24px; margin-bottom: 24px; }
+        .section h2 { font-size: 1.1rem; margin-bottom: 16px; color: #e6edf3; border-bottom: 1px solid #30363d; padding-bottom: 10px; }
+
+        /* Finding cards */
+        .finding { background: #0d1117; border: 1px solid #30363d; border-radius: 8px; padding: 16px; margin-bottom: 12px; border-left: 4px solid #30363d; }
+        .finding.CRITICAL { border-left-color: #ff4444; }
+        .finding.HIGH { border-left-color: #ff8c00; }
+        .finding.MEDIUM { border-left-color: #ffd700; }
+        .finding.LOW { border-left-color: #00c8ff; }
+        .finding-header { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+        .severity { padding: 2px 10px; border-radius: 20px; font-size: 0.72rem; font-weight: 700; }
+        .severity.CRITICAL { background: #3d0000; color: #ff4444; }
+        .severity.HIGH { background: #3d2000; color: #ff8c00; }
+        .severity.MEDIUM { background: #3d3000; color: #ffd700; }
+        .mitre-tag { background: #1c2a3a; color: #00c8ff; padding: 2px 10px; border-radius: 20px; font-size: 0.72rem; }
+        .finding-detail { font-size: 0.82rem; color: #8b949e; font-family: monospace; }
+        .finding-detail span { color: #c9d1d9; }
+
+        /* IOC table */
+        table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+        th { text-align: left; padding: 8px 12px; background: #0d1117; color: #8b949e; font-weight: 600; }
+        td { padding: 8px 12px; border-top: 1px solid #21262d; font-family: monospace; color: #00c8ff; }
+
+        /* Timeline */
+        .timeline-item { display: flex; gap: 16px; margin-bottom: 16px; align-items: flex-start; }
+        .tl-dot { width: 12px; height: 12px; border-radius: 50%; margin-top: 4px; flex-shrink: 0; }
+        .tl-dot.CRITICAL { background: #ff4444; }
+        .tl-dot.HIGH { background: #ff8c00; }
+        .tl-dot.MEDIUM { background: #ffd700; }
+        .tl-line { border-left: 1px solid #30363d; margin-left: 5px; padding-left: 21px; }
+        .tl-tactic { font-size: 0.75rem; color: #8b949e; }
+        .tl-name { font-size: 0.9rem; color: #e6edf3; }
+
+        /* AI Report */
+        .report-box { background: #0d1117; border: 1px solid #30363d; border-radius: 8px; padding: 20px; max-height: 500px; overflow-y: auto; }
+        .empty { color: #484f58; font-style: italic; text-align: center; padding: 20px; }
+    </style>
+</head>
+<body>
+    <a href="/" class="back">← Analyze another PCAP</a>
+    <h1>🔍 Threat Analysis Results</h1>
+
+    <!-- Stats -->
+    <div class="stats">
+        <div class="stat"><div class="num">{{ stats.total_packets }}</div><div class="label">Packets Analyzed</div></div>
+        <div class="stat"><div class="num">{{ stats.total_flows }}</div><div class="label">Network Flows</div></div>
+        <div class="stat"><div class="num">{{ stats.total_findings }}</div><div class="label">Threats Detected</div></div>
+        <div class="stat"><div class="num">{{ stats.total_iocs }}</div><div class="label">IOCs Extracted</div></div>
+    </div>
+
+    <!-- Attack Timeline -->
+    <div class="section">
+        <h2>⚡ Attack Timeline</h2>
+        {% if timeline %}
+            <div class="tl-line">
+            {% for item in timeline %}
+            <div class="timeline-item">
+                <div class="tl-dot {{ item.severity }}"></div>
+                <div>
+                    <div class="tl-name">{{ item.mitre_name }}</div>
+                    <div class="tl-tactic">{{ item.mitre_id }} · {{ item.tactic }} · <span class="severity {{ item.severity }}" style="display:inline;background:none;padding:0">{{ item.severity }}</span></div>
+                </div>
+            </div>
+            {% endfor %}
+            </div>
+        {% else %}
+            <p class="empty">No threats detected in this PCAP.</p>
+        {% endif %}
+    </div>
+
+    <!-- Findings -->
+    <div class="section">
+        <h2>🎯 Detection Findings</h2>
+
+        {% for category, items in findings.items() %}
+        {% for f in items %}
+        <div class="finding {{ f.severity }}">
+            <div class="finding-header">
+                <span class="severity {{ f.severity }}">{{ f.severity }}</span>
+                <span class="mitre-tag">{{ f.mitre }}</span>
+                <strong style="font-size:0.85rem">{{ category | upper }}</strong>
+            </div>
+            <div class="finding-detail">
+                {% for k, v in f.items() %}
+                {% if k not in ['mitre', 'severity'] %}
+                {{ k }}: <span>{{ v }}</span> &nbsp;
+                {% endif %}
+                {% endfor %}
+            </div>
+        </div>
+        {% endfor %}
+        {% endfor %}
+
+        {% if stats.total_findings == 0 %}
+        <p class="empty">No threats detected.</p>
+        {% endif %}
+    </div>
+
+    <!-- IOCs -->
+    <div class="section">
+        <h2>🔴 Indicators of Compromise</h2>
+        {% if iocs.ips or iocs.domains %}
+        <table>
+            <tr><th>Type</th><th>Indicator</th></tr>
+            {% for ip in iocs.ips %}
+            <tr><td>IP Address</td><td>{{ ip }}</td></tr>
+            {% endfor %}
+            {% for domain in iocs.domains %}
+            <tr><td>Domain</td><td>{{ domain }}</td></tr>
+            {% endfor %}
+        </table>
+        {% else %}
+        <p class="empty">No IOCs extracted.</p>
+        {% endif %}
+    </div>
+
+    <!-- AI Report -->
+    <div class="section">
+        <h2>🤖 AI-Generated Incident Report</h2>
+        <div class="report-box">{{ report | safe }}</div>
+    </div>
+
+</body>
+</html>

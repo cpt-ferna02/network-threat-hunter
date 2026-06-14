@@ -1,0 +1,6 @@
+.env
+venv/
+uploads/*.pcap
+__pycache__/
+*.pyc
+reports/
